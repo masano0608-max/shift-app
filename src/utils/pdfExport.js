@@ -1,83 +1,103 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
+function parseTimeToMin(str) {
+  if (!str) return null;
+  const parts = String(str).split(':').map(Number);
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+  return parts[0] * 60 + parts[1];
+}
+
+function minToTimeStr(min) {
+  if (min == null || isNaN(min) || min === 0) return '';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+function calcDayMinutes(d) {
+  const start = parseTimeToMin(d.startTime);
+  const end = parseTimeToMin(d.endTime);
+  if (start == null || end == null) return 0;
+  let work = end - start;
+  if (work < 0) work += 24 * 60;
+  const breakMin = parseTimeToMin(d.breakTime) ?? 0;
+  return Math.max(0, work - breakMin);
+}
+
 function buildHTML(record) {
   const days = record.dailyRecords || [];
+  const totalMin = days.reduce((sum, d) => sum + calcDayMinutes(d), 0);
+  const workDays = days.filter((d) => calcDayMinutes(d) > 0).length;
+  const rate = Number(record.hourlyRate) || 0;
+  const reward = rate && totalMin ? Math.round((totalMin / 60) * rate) : null;
+
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
   const rows = days.map((d) => {
     const date = d.date ? new Date(d.date) : null;
-    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
     const weekday = date ? weekdays[date.getDay()] : (d.weekday || '');
     const dayNum = date ? `${date.getMonth() + 1}/${date.getDate()}` : '';
     const isHoliday = weekday === '日';
     const isSat = weekday === '土';
-    const color = isHoliday ? '#ffecec' : isSat ? '#ecf0ff' : 'white';
+    const rowBg = isHoliday ? '#ffecec' : isSat ? '#ecf0ff' : 'white';
+    const dayMin = calcDayMinutes(d);
 
-    const fmt = (v) => v || '';
-    return `<tr style="background:${color}">
-      <td>${dayNum}</td>
-      <td>${weekday}</td>
-      <td>${fmt(d.clockIn)}</td>
-      <td>${fmt(d.clockOut)}</td>
-      <td>${fmt(d.breakTime)}</td>
-      <td>${fmt(d.startTime)}</td>
-      <td>${fmt(d.endTime)}</td>
-      <td>${fmt(d.basicHours)}</td>
-      <td>${fmt(d.earlyMorningHours)}</td>
-      <td>${fmt(d.lateNightHours)}</td>
+    return `<tr style="background:${rowBg}">
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${dayNum}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${weekday}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${d.startTime || ''}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${d.endTime || ''}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${d.breakTime || ''}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;color:#27ae60;font-weight:600;">${minToTimeStr(dayMin)}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;">${d.notes || ''}</td>
     </tr>`;
   }).join('');
 
-  const notesRow = record.workHoursNotes
-    ? `<tr><td colspan="10" style="padding:8px;font-size:11px;white-space:pre-wrap;border:1px solid #ccc;background:#fafafa;">稼働時間備考: ${record.workHoursNotes}</td></tr>`
-    : '';
+  const summaryParts = [
+    `出勤日数: <strong>${workDays}日</strong>`,
+    `総稼働時間: <strong>${totalMin > 0 ? minToTimeStr(totalMin) : '—'}</strong>`,
+    `時給: <strong>${rate ? rate.toLocaleString('ja-JP') + '円' : '—'}</strong>`,
+    `報酬: <strong style="color:#1a5276;">${reward != null ? '¥' + reward.toLocaleString('ja-JP') : '—'}</strong>`,
+  ].map((s) => `<span style="margin-right:20px;">${s}</span>`).join('');
 
-  const summaryItems = [
-    ['総就業時間', record.totalWorkHours],
-    ['早朝割増時間', record.earlyMorningHours],
-    ['深夜割増時間', record.lateNightHours],
-    ['出勤日数', record.workDays ? `${record.workDays}日` : ''],
-    ['時給', record.hourlyRate ? `${Number(record.hourlyRate).toLocaleString('ja-JP')}円` : ''],
-  ].filter(([, v]) => v).map(([k, v]) => `
-    <div style="display:inline-block;margin:0 12px 6px 0;font-size:12px;">
-      <span style="color:#555;">${k}: </span><strong>${v}</strong>
-    </div>`).join('');
+  const notesSection = record.workHoursNotes
+    ? `<div style="margin-top:10px;padding:8px 12px;background:#fafafa;border:1px solid #ddd;border-radius:4px;font-size:11px;white-space:pre-wrap;">備考: ${record.workHoursNotes}</div>`
+    : '';
 
   return `
     <div style="
       font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Meiryo', sans-serif;
       padding: 24px;
-      width: 1050px;
+      width: 900px;
       color: #222;
+      background: white;
     ">
       <h2 style="text-align:center;margin:0 0 8px;font-size:18px;">
         ${record.year}年${record.month}月 シフト表
       </h2>
-      <div style="margin-bottom:8px;font-size:13px;">
+      <div style="margin-bottom:10px;font-size:13px;">
         氏名: <strong>${record.name || ''}</strong>
         所属: <strong>${record.department || ''}</strong>
       </div>
-      <div style="margin-bottom:12px;padding:8px 12px;background:#f0f4ff;border-radius:6px;border:1px solid #c8d8f8;">
-        ${summaryItems}
+      <div style="margin-bottom:12px;padding:10px 14px;background:#f0f4ff;border-radius:6px;border:1px solid #c8d8f8;font-size:13px;">
+        ${summaryParts}
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      ${notesSection}
+      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:12px;">
         <thead>
           <tr style="background:#2c3e50;color:white;">
-            <th style="padding:6px 4px;border:1px solid #555;min-width:40px;">日</th>
-            <th style="padding:6px 4px;border:1px solid #555;min-width:28px;">曜日</th>
-            <th style="padding:6px 4px;border:1px solid #555;">出社</th>
-            <th style="padding:6px 4px;border:1px solid #555;">退社</th>
-            <th style="padding:6px 4px;border:1px solid #555;">休憩</th>
-            <th style="padding:6px 4px;border:1px solid #555;">開始</th>
-            <th style="padding:6px 4px;border:1px solid #555;">終了</th>
-            <th style="padding:6px 4px;border:1px solid #555;">基本</th>
-            <th style="padding:6px 4px;border:1px solid #555;">早朝割増</th>
-            <th style="padding:6px 4px;border:1px solid #555;">深夜割増</th>
+            <th style="padding:7px 8px;border:1px solid #555;min-width:45px;">日</th>
+            <th style="padding:7px 8px;border:1px solid #555;min-width:30px;">曜日</th>
+            <th style="padding:7px 8px;border:1px solid #555;">開始</th>
+            <th style="padding:7px 8px;border:1px solid #555;">終了</th>
+            <th style="padding:7px 8px;border:1px solid #555;">休憩</th>
+            <th style="padding:7px 8px;border:1px solid #555;">稼働時間</th>
+            <th style="padding:7px 8px;border:1px solid #555;width:200px;">備考</th>
           </tr>
         </thead>
         <tbody>
           ${rows}
-          ${notesRow}
         </tbody>
       </table>
       <div style="margin-top:10px;font-size:10px;color:#777;text-align:right;">
@@ -108,7 +128,6 @@ export async function exportToPDF(record) {
     if (imgHeight <= pageHeight) {
       doc.addImage(imgData, 'PNG', 0, 0, pageWidth, imgHeight);
     } else {
-      // 複数ページに分割
       let yOffset = 0;
       const ratio = canvas.width / pageWidth;
       while (yOffset < canvas.height) {

@@ -6,24 +6,6 @@ import './App.css';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
-function parseHours(str) {
-  if (!str) return 0;
-  const [h, m] = String(str).split(':').map(Number);
-  return (h || 0) + (m || 0) / 60;
-}
-
-function calculateReward(totalWorkHours, earlyMorningHours, lateNightHours, hourlyRate) {
-  const total = parseHours(totalWorkHours);
-  const early = parseHours(earlyMorningHours);
-  const late = parseHours(lateNightHours);
-  const rate = Number(hourlyRate) || 0;
-  if (!rate || !total) return null;
-  const base = total * rate;
-  const earlyPremium = early * rate * 0.25;
-  const latePremium = late * rate * 0.25;
-  return Math.round(base + earlyPremium + latePremium);
-}
-
 function getDaysInMonth(year, month) {
   const days = new Date(year, month, 0).getDate();
   return Array.from({ length: days }, (_, i) => {
@@ -32,29 +14,56 @@ function getDaysInMonth(year, month) {
   });
 }
 
+function parseTimeToMin(str) {
+  if (!str) return null;
+  const parts = String(str).split(':').map(Number);
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+  return parts[0] * 60 + parts[1];
+}
+
+function minToTimeStr(min) {
+  if (min == null || isNaN(min)) return '';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+function calcDayMinutes(d) {
+  const start = parseTimeToMin(d.startTime);
+  const end = parseTimeToMin(d.endTime);
+  if (start == null || end == null) return 0;
+  let work = end - start;
+  if (work < 0) work += 24 * 60;
+  const breakMin = parseTimeToMin(d.breakTime) ?? 0;
+  return Math.max(0, work - breakMin);
+}
+
+function calcSummary(dailyRecords, hourlyRate) {
+  const records = dailyRecords || [];
+  const totalMin = records.reduce((sum, d) => sum + calcDayMinutes(d), 0);
+  const workDays = records.filter((d) => calcDayMinutes(d) > 0).length;
+  const rate = Number(hourlyRate) || 0;
+  const reward = rate && totalMin ? Math.round((totalMin / 60) * rate) : null;
+  return { totalMin, workDays, reward };
+}
+
+const newDailyRecord = (d) => ({
+  date: d.date,
+  weekday: d.weekday,
+  startTime: '',
+  endTime: '',
+  breakTime: '',
+  notes: '',
+});
+
 const emptyRecord = () => ({
   year: new Date().getFullYear(),
   month: new Date().getMonth() + 1,
   name: '',
   department: '',
-  totalWorkHours: '',
-  earlyMorningHours: '',
-  lateNightHours: '',
-  workDays: '',
   hourlyRate: '',
   workHoursNotes: '',
-  dailyRecords: getDaysInMonth(new Date().getFullYear(), new Date().getMonth() + 1).map((d) => ({
-    date: d.date,
-    weekday: d.weekday,
-    clockIn: '',
-    clockOut: '',
-    breakTime: '',
-    startTime: '',
-    endTime: '',
-    basicHours: '',
-    earlyMorningHours: '',
-    lateNightHours: '',
-  })),
+  dailyRecords: getDaysInMonth(new Date().getFullYear(), new Date().getMonth() + 1).map(newDailyRecord),
 });
 
 function App() {
@@ -75,18 +84,7 @@ function App() {
       if (updates.year !== undefined || updates.month !== undefined) {
         next.dailyRecords = getDaysInMonth(next.year, next.month).map((d) => {
           const existing = prev.dailyRecords?.find((r) => r.date === d.date);
-          return existing || {
-            date: d.date,
-            weekday: d.weekday,
-            clockIn: '',
-            clockOut: '',
-            breakTime: '',
-            startTime: '',
-            endTime: '',
-            basicHours: '',
-            earlyMorningHours: '',
-            lateNightHours: '',
-          };
+          return existing ? { ...newDailyRecord(d), ...existing, date: d.date, weekday: d.weekday } : newDailyRecord(d);
         });
       }
       return next;
@@ -117,18 +115,7 @@ function App() {
     const base = getDaysInMonth(record.year || new Date().getFullYear(), record.month || new Date().getMonth() + 1);
     const dailyRecords = base.map((d) => {
       const existing = record.dailyRecords?.find((r) => r.date === d.date);
-      return existing ? { ...existing, date: d.date, weekday: d.weekday } : {
-        date: d.date,
-        weekday: d.weekday,
-        clockIn: '',
-        clockOut: '',
-        breakTime: '',
-        startTime: '',
-        endTime: '',
-        basicHours: '',
-        earlyMorningHours: '',
-        lateNightHours: '',
-      };
+      return existing ? { ...newDailyRecord(d), ...existing, date: d.date, weekday: d.weekday } : newDailyRecord(d);
     });
     setFormData({ ...emptyRecord(), ...record, dailyRecords });
     setEditingId(record.id);
@@ -163,6 +150,7 @@ function App() {
   };
 
   const days = formData.dailyRecords || [];
+  const { totalMin, workDays, reward } = calcSummary(days, formData.hourlyRate);
 
   return (
     <div className="app">
@@ -207,25 +195,29 @@ function App() {
 
           <section className="section">
             <h3>集計</h3>
-            <div className="form-grid">
-              <div><label>総就業時間</label><input value={formData.totalWorkHours} onChange={(e) => updateForm({ totalWorkHours: e.target.value })} placeholder="例: 53:25" /></div>
-              <div><label>早朝割増時間</label><input value={formData.earlyMorningHours} onChange={(e) => updateForm({ earlyMorningHours: e.target.value })} /></div>
-              <div><label>深夜割増時間</label><input value={formData.lateNightHours} onChange={(e) => updateForm({ lateNightHours: e.target.value })} /></div>
-              <div><label>出勤日数</label><input type="number" value={formData.workDays} onChange={(e) => updateForm({ workDays: e.target.value })} /></div>
-              <div><label>時給（円）</label><input type="number" value={formData.hourlyRate} onChange={(e) => updateForm({ hourlyRate: e.target.value })} placeholder="例: 2400" /></div>
+            <div className="form-row">
+              <label>時給（円）</label>
+              <input type="number" value={formData.hourlyRate} onChange={(e) => updateForm({ hourlyRate: e.target.value })} placeholder="例: 2400" />
             </div>
-            {(() => {
-              const reward = calculateReward(formData.totalWorkHours, formData.earlyMorningHours, formData.lateNightHours, formData.hourlyRate);
-              return reward !== null ? (
-                <div className="reward-display">
-                  <span className="reward-label">報酬（自動計算）</span>
-                  <span className="reward-value">¥{reward.toLocaleString('ja-JP')}</span>
-                </div>
-              ) : null;
-            })()}
+            <div className="summary-cards">
+              <div className="summary-card">
+                <span className="summary-card-label">出勤日数</span>
+                <span className="summary-card-value">{workDays}<small> 日</small></span>
+              </div>
+              <div className="summary-card">
+                <span className="summary-card-label">総稼働時間</span>
+                <span className="summary-card-value">{totalMin > 0 ? minToTimeStr(totalMin) : '—'}</span>
+              </div>
+              <div className="summary-card highlight">
+                <span className="summary-card-label">報酬（自動計算）</span>
+                <span className="summary-card-value">
+                  {reward != null ? `¥${reward.toLocaleString('ja-JP')}` : '—'}
+                </span>
+              </div>
+            </div>
             <div className="form-group-full">
-              <label>稼働時間備考</label>
-              <textarea value={formData.workHoursNotes} onChange={(e) => updateForm({ workHoursNotes: e.target.value })} placeholder="稼働時間に関する備考を記入" rows={3} />
+              <label>備考</label>
+              <textarea value={formData.workHoursNotes} onChange={(e) => updateForm({ workHoursNotes: e.target.value })} placeholder="備考を記入" rows={3} />
             </div>
           </section>
 
@@ -237,31 +229,28 @@ function App() {
                   <tr>
                     <th>日</th>
                     <th>曜日</th>
-                    <th>出社</th>
-                    <th>退社</th>
-                    <th>休憩</th>
                     <th>開始</th>
                     <th>終了</th>
-                    <th>基本</th>
-                    <th>早朝</th>
-                    <th>深夜</th>
+                    <th>休憩</th>
+                    <th>稼働時間</th>
+                    <th>備考</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {days.map((d, i) => (
-                    <tr key={d.date}>
-                      <td>{new Date(d.date).getDate()}</td>
-                      <td>{d.weekday}</td>
-                      <td><input type="time" value={d.clockIn} onChange={(e) => updateDailyRecord(i, { clockIn: e.target.value })} /></td>
-                      <td><input type="time" value={d.clockOut} onChange={(e) => updateDailyRecord(i, { clockOut: e.target.value })} /></td>
-                      <td><input value={d.breakTime} onChange={(e) => updateDailyRecord(i, { breakTime: e.target.value })} placeholder="0:15" size={5} /></td>
-                      <td><input type="time" value={d.startTime} onChange={(e) => updateDailyRecord(i, { startTime: e.target.value })} /></td>
-                      <td><input type="time" value={d.endTime} onChange={(e) => updateDailyRecord(i, { endTime: e.target.value })} /></td>
-                      <td><input value={d.basicHours} onChange={(e) => updateDailyRecord(i, { basicHours: e.target.value })} placeholder="4:45" size={5} /></td>
-                      <td><input value={d.earlyMorningHours} onChange={(e) => updateDailyRecord(i, { earlyMorningHours: e.target.value })} size={4} /></td>
-                      <td><input value={d.lateNightHours} onChange={(e) => updateDailyRecord(i, { lateNightHours: e.target.value })} size={4} /></td>
-                    </tr>
-                  ))}
+                  {days.map((d, i) => {
+                    const dayMin = calcDayMinutes(d);
+                    return (
+                      <tr key={d.date}>
+                        <td>{new Date(d.date).getDate()}</td>
+                        <td>{d.weekday}</td>
+                        <td><input type="time" value={d.startTime} onChange={(e) => updateDailyRecord(i, { startTime: e.target.value })} /></td>
+                        <td><input type="time" value={d.endTime} onChange={(e) => updateDailyRecord(i, { endTime: e.target.value })} /></td>
+                        <td><input value={d.breakTime} onChange={(e) => updateDailyRecord(i, { breakTime: e.target.value })} placeholder="0:30" size={5} /></td>
+                        <td className="calc-cell">{dayMin > 0 ? minToTimeStr(dayMin) : ''}</td>
+                        <td><input value={d.notes || ''} onChange={(e) => updateDailyRecord(i, { notes: e.target.value })} placeholder="備考" className="notes-input" /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -281,22 +270,27 @@ function App() {
             <p className="empty">保存された履歴はありません。</p>
           ) : (
             <ul className="history-list">
-              {history.map((record) => (
-                <li key={record.id} className="history-item">
-                  <div className="history-info">
-                    <span className="title">{record.year}年{record.month}月 - {record.name || '無題'}</span>
-                    <span className="meta">
-                      作成: {new Date(record.createdAt).toLocaleString('ja-JP')}
-                      {record.editedAt && <span className="edited"> ｜ 編集: {new Date(record.editedAt).toLocaleString('ja-JP')}</span>}
-                    </span>
-                  </div>
-                  <div className="history-actions">
-                    <button onClick={() => handleEdit(record)}>編集</button>
-                    <button onClick={() => exportToPDF(record)}>PDF</button>
-                    <button className="btn-delete" onClick={() => handleDelete(record.id)}>削除</button>
-                  </div>
-                </li>
-              ))}
+              {history.map((record) => {
+                const { totalMin: tMin, reward: rwd } = calcSummary(record.dailyRecords, record.hourlyRate);
+                return (
+                  <li key={record.id} className="history-item">
+                    <div className="history-info">
+                      <span className="title">{record.year}年{record.month}月 - {record.name || '無題'}</span>
+                      <span className="meta">
+                        {tMin > 0 && <span>稼働: {minToTimeStr(tMin)}</span>}
+                        {rwd != null && <span>　報酬: ¥{rwd.toLocaleString('ja-JP')}</span>}
+                        　作成: {new Date(record.createdAt).toLocaleString('ja-JP')}
+                        {record.editedAt && <span className="edited"> ｜ 編集: {new Date(record.editedAt).toLocaleString('ja-JP')}</span>}
+                      </span>
+                    </div>
+                    <div className="history-actions">
+                      <button onClick={() => handleEdit(record)}>編集</button>
+                      <button onClick={() => exportToPDF(record)}>PDF</button>
+                      <button className="btn-delete" onClick={() => handleDelete(record.id)}>削除</button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </main>
