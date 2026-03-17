@@ -1,10 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
-import { getHistory, saveToHistory, updateHistory } from './utils/storage';
+import { getHistory, saveToHistory, updateHistory, deleteFromHistory } from './utils/storage';
 import { exportToPDF } from './utils/pdfExport';
 import { parseExcelFile } from './utils/excelImport';
 import './App.css';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+function parseHours(str) {
+  if (!str) return 0;
+  const [h, m] = String(str).split(':').map(Number);
+  return (h || 0) + (m || 0) / 60;
+}
+
+function calculateReward(totalWorkHours, earlyMorningHours, lateNightHours, hourlyRate) {
+  const total = parseHours(totalWorkHours);
+  const early = parseHours(earlyMorningHours);
+  const late = parseHours(lateNightHours);
+  const rate = Number(hourlyRate) || 0;
+  if (!rate || !total) return null;
+  const base = total * rate;
+  const earlyPremium = early * rate * 0.25;
+  const latePremium = late * rate * 0.25;
+  return Math.round(base + earlyPremium + latePremium);
+}
 
 function getDaysInMonth(year, month) {
   const days = new Date(year, month, 0).getDate();
@@ -123,6 +141,12 @@ function App() {
     setView('history');
   };
 
+  const handleDelete = (id) => {
+    if (!window.confirm('この記録を削除しますか？')) return;
+    deleteFromHistory(id);
+    setHistory(getHistory());
+  };
+
   const handleImportExcel = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -190,6 +214,15 @@ function App() {
               <div><label>出勤日数</label><input type="number" value={formData.workDays} onChange={(e) => updateForm({ workDays: e.target.value })} /></div>
               <div><label>時給（円）</label><input type="number" value={formData.hourlyRate} onChange={(e) => updateForm({ hourlyRate: e.target.value })} placeholder="例: 2400" /></div>
             </div>
+            {(() => {
+              const reward = calculateReward(formData.totalWorkHours, formData.earlyMorningHours, formData.lateNightHours, formData.hourlyRate);
+              return reward !== null ? (
+                <div className="reward-display">
+                  <span className="reward-label">報酬（自動計算）</span>
+                  <span className="reward-value">¥{reward.toLocaleString('ja-JP')}</span>
+                </div>
+              ) : null;
+            })()}
             <div className="form-group-full">
               <label>稼働時間備考</label>
               <textarea value={formData.workHoursNotes} onChange={(e) => updateForm({ workHoursNotes: e.target.value })} placeholder="稼働時間に関する備考を記入" rows={3} />
@@ -260,6 +293,7 @@ function App() {
                   <div className="history-actions">
                     <button onClick={() => handleEdit(record)}>編集</button>
                     <button onClick={() => exportToPDF(record)}>PDF</button>
+                    <button className="btn-delete" onClick={() => handleDelete(record.id)}>削除</button>
                   </div>
                 </li>
               ))}

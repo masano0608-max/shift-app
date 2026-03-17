@@ -343,3 +343,26 @@ body {
   color: #95a5a6;
   padding: 40px;
 }
+
+.reward-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 20px;
+  background: #eaf6ff;
+  border: 1px solid #aed6f1;
+  border-radius: 8px;
+}
+
+.reward-label {
+  font-size: 14px;
+  color: #2471a3;
+  font-weight: 600;
+}
+
+.reward-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a5276;
+}
