@@ -275,7 +275,7 @@ function App() {
                 return (
                   <li key={record.id} className="history-item">
                     <div className="history-info">
-                      <span className="title">{record.year}年{record.month}月 - {record.name || '無題'}</span>
+                      <span className="title">{record.year}年{record.month}月 請求書</span>
                       <span className="meta">
                         {tMin > 0 && <span>稼働: {minToTimeStr(tMin)}</span>}
                         {rwd != null && <span>　報酬: ¥{rwd.toLocaleString('ja-JP')}</span>}
