@@ -74,7 +74,7 @@ function buildHTML(record) {
       background: white;
     ">
       <h2 style="text-align:center;margin:0 0 6px;font-size:15px;">
-        ${record.year}年${record.month}月 シフト表
+        ${record.year}年${record.month}月 請求書
       </h2>
       <div style="margin-bottom:6px;font-size:11px;">
         氏名: <strong>${record.name || ''}</strong>
