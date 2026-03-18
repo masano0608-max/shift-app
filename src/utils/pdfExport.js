@@ -69,7 +69,7 @@ function buildHTML(record) {
     <div style="
       font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Meiryo', sans-serif;
       padding: 14px 18px;
-      width: 1000px;
+      width: 680px;
       color: #222;
       background: white;
     ">
@@ -120,7 +120,7 @@ export async function exportToPDF(record) {
     const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
     const imgData = canvas.toDataURL('image/png');
 
-    const doc = new jsPDF('l', 'mm', 'a4');
+    const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
