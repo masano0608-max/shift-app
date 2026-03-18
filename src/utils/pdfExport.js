@@ -44,13 +44,13 @@ function buildHTML(record) {
     const dayMin = calcDayMinutes(d);
 
     return `<tr style="background:${rowBg}">
-      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${dayNum}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${weekday}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${d.startTime || ''}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${d.endTime || ''}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;">${d.breakTime || ''}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center;color:#27ae60;font-weight:600;">${minToTimeStr(dayMin)}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;">${d.notes || ''}</td>
+      <td style="padding:2px 6px;border:1px solid #ddd;text-align:center;">${dayNum}</td>
+      <td style="padding:2px 6px;border:1px solid #ddd;text-align:center;">${weekday}</td>
+      <td style="padding:2px 6px;border:1px solid #ddd;text-align:center;">${d.startTime || ''}</td>
+      <td style="padding:2px 6px;border:1px solid #ddd;text-align:center;">${d.endTime || ''}</td>
+      <td style="padding:2px 6px;border:1px solid #ddd;text-align:center;">${d.breakTime || ''}</td>
+      <td style="padding:2px 6px;border:1px solid #ddd;text-align:center;color:#27ae60;font-weight:600;">${minToTimeStr(dayMin)}</td>
+      <td style="padding:2px 6px;border:1px solid #ddd;">${d.notes || ''}</td>
     </tr>`;
   }).join('');
 
@@ -68,39 +68,39 @@ function buildHTML(record) {
   return `
     <div style="
       font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Meiryo', sans-serif;
-      padding: 24px;
-      width: 900px;
+      padding: 14px 18px;
+      width: 1000px;
       color: #222;
       background: white;
     ">
-      <h2 style="text-align:center;margin:0 0 8px;font-size:18px;">
+      <h2 style="text-align:center;margin:0 0 6px;font-size:15px;">
         ${record.year}年${record.month}月 シフト表
       </h2>
-      <div style="margin-bottom:10px;font-size:13px;">
+      <div style="margin-bottom:6px;font-size:11px;">
         氏名: <strong>${record.name || ''}</strong>
         所属: <strong>${record.department || ''}</strong>
       </div>
-      <div style="margin-bottom:12px;padding:10px 14px;background:#f0f4ff;border-radius:6px;border:1px solid #c8d8f8;font-size:13px;">
+      <div style="margin-bottom:8px;padding:6px 12px;background:#f0f4ff;border-radius:4px;border:1px solid #c8d8f8;font-size:11px;">
         ${summaryParts}
       </div>
       ${notesSection}
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:10px;margin-top:6px;">
         <thead>
           <tr style="background:#2c3e50;color:white;">
-            <th style="padding:7px 8px;border:1px solid #555;min-width:45px;">日</th>
-            <th style="padding:7px 8px;border:1px solid #555;min-width:30px;">曜日</th>
-            <th style="padding:7px 8px;border:1px solid #555;">開始</th>
-            <th style="padding:7px 8px;border:1px solid #555;">終了</th>
-            <th style="padding:7px 8px;border:1px solid #555;">休憩</th>
-            <th style="padding:7px 8px;border:1px solid #555;">稼働時間</th>
-            <th style="padding:7px 8px;border:1px solid #555;width:200px;">備考</th>
+            <th style="padding:4px 6px;border:1px solid #555;min-width:40px;">日</th>
+            <th style="padding:4px 6px;border:1px solid #555;min-width:28px;">曜日</th>
+            <th style="padding:4px 6px;border:1px solid #555;">開始</th>
+            <th style="padding:4px 6px;border:1px solid #555;">終了</th>
+            <th style="padding:4px 6px;border:1px solid #555;">休憩</th>
+            <th style="padding:4px 6px;border:1px solid #555;">稼働時間</th>
+            <th style="padding:4px 6px;border:1px solid #555;width:220px;">備考</th>
           </tr>
         </thead>
         <tbody>
           ${rows}
         </tbody>
       </table>
-      <div style="margin-top:10px;font-size:10px;color:#777;text-align:right;">
+      <div style="margin-top:6px;font-size:9px;color:#777;text-align:right;">
         作成日: ${new Date(record.createdAt).toLocaleString('ja-JP')}
         ${record.editedAt ? `　最終編集: ${new Date(record.editedAt).toLocaleString('ja-JP')}` : ''}
       </div>
@@ -123,27 +123,15 @@ export async function exportToPDF(record) {
     const doc = new jsPDF('l', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
 
-    if (imgHeight <= pageHeight) {
-      doc.addImage(imgData, 'PNG', 0, 0, pageWidth, imgHeight);
-    } else {
-      let yOffset = 0;
-      const ratio = canvas.width / pageWidth;
-      while (yOffset < canvas.height) {
-        const sliceHeight = Math.min(pageHeight * ratio, canvas.height - yOffset);
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = canvas.width;
-        sliceCanvas.height = sliceHeight;
-        const ctx = sliceCanvas.getContext('2d');
-        ctx.drawImage(canvas, 0, yOffset, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-        const sliceData = sliceCanvas.toDataURL('image/png');
-        if (yOffset > 0) doc.addPage();
-        const sliceImgHeight = (sliceHeight * pageWidth) / canvas.width;
-        doc.addImage(sliceData, 'PNG', 0, 0, pageWidth, sliceImgHeight);
-        yOffset += sliceHeight;
-      }
-    }
+    // 縦横ともにページ内に収まるようスケールを計算
+    const scaleByWidth = pageWidth / canvas.width;
+    const scaleByHeight = pageHeight / canvas.height;
+    const scale = Math.min(scaleByWidth, scaleByHeight);
+    const finalWidth = canvas.width * scale;
+    const finalHeight = canvas.height * scale;
+
+    doc.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
 
     const filename = `シフト表_${record.year}年${record.month}月_${record.name || '無題'}.pdf`;
     doc.save(filename);
