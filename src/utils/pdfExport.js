@@ -133,7 +133,8 @@ export async function exportToPDF(record) {
 
     doc.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
 
-    const filename = `シフト表_${record.year}年${record.month}月_${record.name || '無題'}.pdf`;
+    const today = new Date();
+    const filename = `藤澤${today.getFullYear()}.${today.getMonth() + 1}.${today.getDate()}.pdf`;
     doc.save(filename);
   } finally {
     document.body.removeChild(container);
