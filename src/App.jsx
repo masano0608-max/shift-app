@@ -75,7 +75,7 @@ function App() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    setHistory(getHistory());
+    getHistory().then(setHistory);
   }, [view]);
 
   const updateForm = (updates) => {
@@ -99,16 +99,16 @@ function App() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editingId) {
-      updateHistory(editingId, formData);
+      await updateHistory(editingId, formData);
       setEditingId(null);
     } else {
-      saveToHistory(formData);
+      await saveToHistory(formData);
     }
     setFormData(emptyRecord());
     setView('history');
-    setHistory(getHistory());
+    getHistory().then(setHistory);
   };
 
   const handleEdit = (record) => {
@@ -128,10 +128,10 @@ function App() {
     setView('history');
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm('この記録を削除しますか？')) return;
-    deleteFromHistory(id);
-    setHistory(getHistory());
+    await deleteFromHistory(id);
+    getHistory().then(setHistory);
   };
 
   const handleImportExcel = async (e) => {

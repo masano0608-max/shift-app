@@ -1,44 +1,42 @@
-const STORAGE_KEY = 'shift_history';
+import { db } from './firebase';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  orderBy,
+} from 'firebase/firestore';
 
-export function getHistory() {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (e) {
-    console.error('Failed to load history:', e);
-    return [];
-  }
+const COL = 'history';
+
+export async function getHistory() {
+  const q = query(collection(db, COL), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export function saveToHistory(record) {
-  const history = getHistory();
-  const newRecord = {
+export async function saveToHistory(record) {
+  const data = {
     ...record,
-    id: record.id || crypto.randomUUID(),
-    createdAt: record.createdAt || new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     editedAt: null,
   };
-  history.unshift(newRecord);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-  return newRecord;
+  const ref = await addDoc(collection(db, COL), data);
+  return { id: ref.id, ...data };
 }
 
-export function updateHistory(id, record) {
-  const history = getHistory();
-  const index = history.findIndex((r) => r.id === id);
-  if (index === -1) return null;
-  const updated = {
+export async function updateHistory(id, record) {
+  const data = {
     ...record,
-    id,
-    createdAt: history[index].createdAt,
     editedAt: new Date().toISOString(),
   };
-  history[index] = updated;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-  return updated;
+  await updateDoc(doc(db, COL, id), data);
+  return { id, ...data };
 }
 
-export function deleteFromHistory(id) {
-  const history = getHistory().filter((r) => r.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+export async function deleteFromHistory(id) {
+  await deleteDoc(doc(db, COL, id));
 }
