@@ -133,8 +133,7 @@ export async function exportToPDF(record) {
 
     doc.addImage(imgData, 'PNG', 0, 0, finalWidth, finalHeight);
 
-    const today = new Date();
-    const filename = `藤澤${today.getFullYear()}.${today.getMonth() + 1}.${today.getDate()}.pdf`;
+    const filename = `藤澤${record.year}.${record.month}.pdf`;
     doc.save(filename);
   } finally {
     document.body.removeChild(container);
