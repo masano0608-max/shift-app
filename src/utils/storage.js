@@ -6,16 +6,14 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  query,
-  orderBy,
 } from 'firebase/firestore';
 
 const COL = 'history';
 
 export async function getHistory() {
-  const q = query(collection(db, COL), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db, COL));
+  const records = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return records.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
 export async function saveToHistory(record) {
