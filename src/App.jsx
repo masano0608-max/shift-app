@@ -10,7 +10,8 @@ function getDaysInMonth(year, month) {
   const days = new Date(year, month, 0).getDate();
   return Array.from({ length: days }, (_, i) => {
     const d = new Date(year, month - 1, i + 1);
-    return { day: i + 1, weekday: WEEKDAYS[d.getDay()], date: d.toISOString().slice(0, 10) };
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+    return { day: i + 1, weekday: WEEKDAYS[d.getDay()], date: dateStr };
   });
 }
 
@@ -241,7 +242,7 @@ function App() {
                     const dayMin = calcDayMinutes(d);
                     return (
                       <tr key={d.date}>
-                        <td>{new Date(d.date).getDate()}</td>
+                        <td>{Number(d.date.slice(8, 10))}</td>
                         <td>{d.weekday}</td>
                         <td><input type="time" value={d.startTime} onChange={(e) => updateDailyRecord(i, { startTime: e.target.value })} /></td>
                         <td><input type="time" value={d.endTime} onChange={(e) => updateDailyRecord(i, { endTime: e.target.value })} /></td>
