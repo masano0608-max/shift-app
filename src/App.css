@@ -58,7 +58,8 @@ body {
 }
 
 .form-container,
-.history-container {
+.history-container,
+.schedule-container {
   background: white;
   border-radius: 8px;
   padding: 24px;
@@ -105,7 +106,8 @@ body {
 }
 
 .form-container h2,
-.history-container h2 {
+.history-container h2,
+.schedule-container h2 {
   margin: 0 0 20px;
   font-size: 1.2rem;
   color: #2c3e50;
@@ -403,4 +405,14 @@ body {
 .notes-input {
   min-width: 120px !important;
   width: 100% !important;
+}
+
+.schedule-row-sun td:first-child,
+.schedule-row-sun td:nth-child(2) {
+  color: #e74c3c;
+}
+
+.schedule-row-sat td:first-child,
+.schedule-row-sat td:nth-child(2) {
+  color: #3498db;
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getHistory, saveToHistory, updateHistory, deleteFromHistory } from './utils/storage';
+import { getSchedules, getScheduleByMonth, saveSchedule, updateSchedule, deleteSchedule } from './utils/scheduleStorage';
 import { exportToPDF } from './utils/pdfExport';
 import { parseExcelFile } from './utils/excelImport';
 import './App.css';
@@ -67,6 +68,27 @@ const emptyRecord = () => ({
   dailyRecords: getDaysInMonth(new Date().getFullYear(), new Date().getMonth() + 1).map(newDailyRecord),
 });
 
+function calcPlannedMinutes(d) {
+  const start = parseTimeToMin(d.startTime);
+  const end = parseTimeToMin(d.endTime);
+  if (start == null || end == null) return 0;
+  let work = end - start;
+  if (work < 0) work += 24 * 60;
+  return Math.max(0, work);
+}
+
+const emptySchedule = (year, month) => ({
+  year,
+  month,
+  days: getDaysInMonth(year, month).map((d) => ({
+    date: d.date,
+    weekday: d.weekday,
+    startTime: '',
+    endTime: '',
+    memo: '',
+  })),
+});
+
 function App() {
   const [view, setView] = useState('form');
   const [history, setHistory] = useState([]);
@@ -75,8 +97,15 @@ function App() {
   const [importError, setImportError] = useState('');
   const fileInputRef = useRef(null);
 
+  const [scheduleData, setScheduleData] = useState(null);
+  const [scheduleList, setScheduleList] = useState([]);
+  const [scheduleYear, setScheduleYear] = useState(new Date().getFullYear());
+  const [scheduleMonth, setScheduleMonth] = useState(new Date().getMonth() + 1);
+  const [scheduleEditingId, setScheduleEditingId] = useState(null);
+
   useEffect(() => {
-    getHistory().then(setHistory);
+    if (view === 'history') getHistory().then(setHistory);
+    if (view === 'schedule') getSchedules().then(setScheduleList);
   }, [view]);
 
   const updateForm = (updates) => {
@@ -150,8 +179,68 @@ function App() {
     e.target.value = '';
   };
 
+  const handleLoadSchedule = async () => {
+    const existing = await getScheduleByMonth(scheduleYear, scheduleMonth);
+    if (existing) {
+      const base = getDaysInMonth(existing.year, existing.month);
+      const days = base.map((d) => {
+        const ex = existing.days?.find((r) => r.date === d.date);
+        return ex ? { ...ex, date: d.date, weekday: d.weekday } : { date: d.date, weekday: d.weekday, startTime: '', endTime: '', memo: '' };
+      });
+      setScheduleData({ ...existing, days });
+      setScheduleEditingId(existing.id);
+    } else {
+      setScheduleData(emptySchedule(scheduleYear, scheduleMonth));
+      setScheduleEditingId(null);
+    }
+  };
+
+  const updateScheduleDay = (index, updates) => {
+    setScheduleData((prev) => {
+      const days = [...prev.days];
+      days[index] = { ...days[index], ...updates };
+      return { ...prev, days };
+    });
+  };
+
+  const handleSaveSchedule = async () => {
+    if (scheduleEditingId) {
+      await updateSchedule(scheduleEditingId, scheduleData);
+    } else {
+      const saved = await saveSchedule(scheduleData);
+      setScheduleEditingId(saved.id);
+    }
+    getSchedules().then(setScheduleList);
+  };
+
+  const handleEditSchedule = (s) => {
+    setScheduleYear(s.year);
+    setScheduleMonth(s.month);
+    const base = getDaysInMonth(s.year, s.month);
+    const days = base.map((d) => {
+      const ex = s.days?.find((r) => r.date === d.date);
+      return ex ? { ...ex, date: d.date, weekday: d.weekday } : { date: d.date, weekday: d.weekday, startTime: '', endTime: '', memo: '' };
+    });
+    setScheduleData({ ...s, days });
+    setScheduleEditingId(s.id);
+  };
+
+  const handleDeleteSchedule = async (id) => {
+    if (!window.confirm('このシフト予定を削除しますか？')) return;
+    await deleteSchedule(id);
+    if (scheduleEditingId === id) {
+      setScheduleData(null);
+      setScheduleEditingId(null);
+    }
+    getSchedules().then(setScheduleList);
+  };
+
   const days = formData.dailyRecords || [];
   const { totalMin, workDays, reward } = calcSummary(days, formData.hourlyRate);
+
+  const scheduleDays = scheduleData?.days || [];
+  const plannedTotalMin = scheduleDays.reduce((sum, d) => sum + calcPlannedMinutes(d), 0);
+  const plannedWorkDays = scheduleDays.filter((d) => calcPlannedMinutes(d) > 0).length;
 
   return (
     <div className="app">
@@ -163,6 +252,9 @@ function App() {
           </button>
           <button className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>
             履歴一覧
+          </button>
+          <button className={view === 'schedule' ? 'active' : ''} onClick={() => setView('schedule')}>
+            シフト予定
           </button>
         </nav>
       </header>
@@ -293,6 +385,103 @@ function App() {
                 );
               })}
             </ul>
+          )}
+        </main>
+      )}
+
+      {view === 'schedule' && (
+        <main className="schedule-container">
+          <h2>シフト予定</h2>
+
+          <section className="section">
+            <div className="form-row">
+              <label>年</label>
+              <input type="number" value={scheduleYear} onChange={(e) => setScheduleYear(+e.target.value)} min={2020} max={2030} />
+              <label>月</label>
+              <input type="number" value={scheduleMonth} onChange={(e) => setScheduleMonth(+e.target.value)} min={1} max={12} />
+              <button className="btn-primary" onClick={handleLoadSchedule}>表示 / 編集</button>
+            </div>
+          </section>
+
+          {scheduleData && (
+            <>
+              <section className="section">
+                <h3>{scheduleData.year}年{scheduleData.month}月 シフト予定</h3>
+                <div className="summary-cards">
+                  <div className="summary-card">
+                    <span className="summary-card-label">予定出勤日数</span>
+                    <span className="summary-card-value">{plannedWorkDays}<small> 日</small></span>
+                  </div>
+                  <div className="summary-card highlight">
+                    <span className="summary-card-label">予定総稼働時間</span>
+                    <span className="summary-card-value">{plannedTotalMin > 0 ? minToTimeStr(plannedTotalMin) : '—'}</span>
+                  </div>
+                </div>
+
+                <div className="daily-table-wrapper">
+                  <table className="daily-table">
+                    <thead>
+                      <tr>
+                        <th>日</th>
+                        <th>曜日</th>
+                        <th>開始</th>
+                        <th>終了</th>
+                        <th>予定時間</th>
+                        <th>メモ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scheduleDays.map((d, i) => {
+                        const planned = calcPlannedMinutes(d);
+                        const rowClass = d.weekday === '日' ? 'schedule-row-sun' : d.weekday === '土' ? 'schedule-row-sat' : '';
+                        return (
+                          <tr key={d.date} className={rowClass}>
+                            <td>{Number(d.date.slice(8, 10))}</td>
+                            <td>{d.weekday}</td>
+                            <td><input type="time" value={d.startTime} onChange={(e) => updateScheduleDay(i, { startTime: e.target.value })} /></td>
+                            <td><input type="time" value={d.endTime} onChange={(e) => updateScheduleDay(i, { endTime: e.target.value })} /></td>
+                            <td className="calc-cell">{planned > 0 ? minToTimeStr(planned) : ''}</td>
+                            <td><input value={d.memo || ''} onChange={(e) => updateScheduleDay(i, { memo: e.target.value })} placeholder="メモ" className="notes-input" /></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <div className="form-actions">
+                <button className="btn-primary" onClick={handleSaveSchedule}>保存</button>
+                <button className="btn-secondary" onClick={() => { setScheduleData(null); setScheduleEditingId(null); }}>クリア</button>
+              </div>
+            </>
+          )}
+
+          {scheduleList.length > 0 && (
+            <section className="section" style={{ marginTop: 24 }}>
+              <h3>保存済みシフト予定</h3>
+              <ul className="history-list">
+                {scheduleList.map((s) => {
+                  const pDays = (s.days || []).filter((d) => calcPlannedMinutes(d) > 0).length;
+                  const pMin = (s.days || []).reduce((sum, d) => sum + calcPlannedMinutes(d), 0);
+                  return (
+                    <li key={s.id} className="history-item">
+                      <div className="history-info">
+                        <span className="title">{s.year}年{s.month}月 シフト予定</span>
+                        <span className="meta">
+                          予定出勤: {pDays}日　予定稼働: {pMin > 0 ? minToTimeStr(pMin) : '—'}
+                          　作成: {new Date(s.createdAt).toLocaleString('ja-JP')}
+                        </span>
+                      </div>
+                      <div className="history-actions">
+                        <button onClick={() => handleEditSchedule(s)}>編集</button>
+                        <button className="btn-delete" onClick={() => handleDeleteSchedule(s.id)}>削除</button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           )}
         </main>
       )}
