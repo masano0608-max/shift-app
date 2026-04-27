@@ -74,7 +74,8 @@ function calcPlannedMinutes(d) {
   if (start == null || end == null) return 0;
   let work = end - start;
   if (work < 0) work += 24 * 60;
-  return Math.max(0, work);
+  const breakMin = parseTimeToMin(d.breakTime) ?? 0;
+  return Math.max(0, work - breakMin);
 }
 
 const emptySchedule = (year, month) => ({
@@ -85,6 +86,7 @@ const emptySchedule = (year, month) => ({
     weekday: d.weekday,
     startTime: '',
     endTime: '',
+    breakTime: '',
     memo: '',
   })),
 });
@@ -185,7 +187,7 @@ function App() {
       const base = getDaysInMonth(existing.year, existing.month);
       const days = base.map((d) => {
         const ex = existing.days?.find((r) => r.date === d.date);
-        return ex ? { ...ex, date: d.date, weekday: d.weekday } : { date: d.date, weekday: d.weekday, startTime: '', endTime: '', memo: '' };
+        return ex ? { ...ex, date: d.date, weekday: d.weekday } : { date: d.date, weekday: d.weekday, startTime: '', endTime: '', breakTime: '', memo: '' };
       });
       setScheduleData({ ...existing, days });
       setScheduleEditingId(existing.id);
@@ -219,7 +221,7 @@ function App() {
     const base = getDaysInMonth(s.year, s.month);
     const days = base.map((d) => {
       const ex = s.days?.find((r) => r.date === d.date);
-      return ex ? { ...ex, date: d.date, weekday: d.weekday } : { date: d.date, weekday: d.weekday, startTime: '', endTime: '', memo: '' };
+      return ex ? { ...ex, date: d.date, weekday: d.weekday } : { date: d.date, weekday: d.weekday, startTime: '', endTime: '', breakTime: '', memo: '' };
     });
     setScheduleData({ ...s, days });
     setScheduleEditingId(s.id);
@@ -426,6 +428,7 @@ function App() {
                         <th>曜日</th>
                         <th>開始</th>
                         <th>終了</th>
+                        <th>休憩</th>
                         <th>予定時間</th>
                         <th>メモ</th>
                       </tr>
@@ -440,6 +443,7 @@ function App() {
                             <td>{d.weekday}</td>
                             <td><input type="time" value={d.startTime} onChange={(e) => updateScheduleDay(i, { startTime: e.target.value })} /></td>
                             <td><input type="time" value={d.endTime} onChange={(e) => updateScheduleDay(i, { endTime: e.target.value })} /></td>
+                            <td><input value={d.breakTime || ''} onChange={(e) => updateScheduleDay(i, { breakTime: e.target.value })} placeholder="0:30" size={5} /></td>
                             <td className="calc-cell">{planned > 0 ? minToTimeStr(planned) : ''}</td>
                             <td><input value={d.memo || ''} onChange={(e) => updateScheduleDay(i, { memo: e.target.value })} placeholder="メモ" className="notes-input" /></td>
                           </tr>
