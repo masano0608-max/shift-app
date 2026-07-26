@@ -291,7 +291,7 @@ function App() {
           <section className="section">
             <h3>集計</h3>
             <div className="form-row">
-              <label>時給（円）</label>
+              <label>時給（円・税込）</label>
               <input type="number" value={formData.hourlyRate} onChange={(e) => updateForm({ hourlyRate: e.target.value })} placeholder="例: 2400" />
             </div>
             <div className="summary-cards">
@@ -304,7 +304,7 @@ function App() {
                 <span className="summary-card-value">{totalMin > 0 ? minToTimeStr(totalMin) : '—'}</span>
               </div>
               <div className="summary-card highlight">
-                <span className="summary-card-label">報酬（自動計算）</span>
+                <span className="summary-card-label">報酬（税込・自動計算）</span>
                 <span className="summary-card-value">
                   {reward != null ? `¥${reward.toLocaleString('ja-JP')}` : '—'}
                 </span>
