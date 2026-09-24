@@ -78,7 +78,13 @@ function buildHTML(record) {
       </h2>
       <div style="margin-bottom:6px;font-size:11px;">
         氏名: <strong>${record.name || ''}</strong>
-        所属: <strong>${record.department || ''}</strong>
+        　所属: <strong>${record.department || ''}</strong>
+      </div>
+      <div style="margin:8px 0;padding:12px 16px;background:#1a5276;border-radius:6px;text-align:center;">
+        <div style="font-size:11px;color:#aac;margin-bottom:2px;">ご請求金額（税込）</div>
+        <div style="font-size:22px;font-weight:bold;color:#fff;letter-spacing:1px;">
+          ${reward != null ? '¥' + reward.toLocaleString('ja-JP') : '—'}
+        </div>
       </div>
       <div style="margin-bottom:8px;padding:6px 12px;background:#f0f4ff;border-radius:4px;border:1px solid #c8d8f8;font-size:11px;">
         ${summaryParts}
